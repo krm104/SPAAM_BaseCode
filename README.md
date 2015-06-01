@@ -40,7 +40,7 @@ This should be the only action required to setup the Visual Studio project (for 
 # Usage
 This project is intended to provide a simple example of how the SPAAM_SVD and Correspondence_Pair objects defined in the SPAAM_SVD.h header file can be used to perform the calculations of a SPAAM calibration. Once the project is built, and the executable created, running the program should result in a 3x4 projection matrix being printed to the console window.
 
-[Console Window](images/console_output.PNG?raw=true)
+![Console Window](images/console_output.PNG?raw=true)
 
 The exact numbers shown in the above image should always appear in the order shown.
 
