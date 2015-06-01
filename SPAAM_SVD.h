@@ -103,6 +103,8 @@ class SPAAM_SVD
 		////Final 3 x 4 Projection Matrox////
 		ublas::matrix< double, boost::numeric::ublas::column_major> Proj3x4;
 
+		////4x4 Projection Matrix usable by OpenGL////
+		public: double projMat3x4[16];
 		////////methods for calculating the SVD decomposition of the SPAAM linear equation matrices///////
 
 		/*****************************************************************************
@@ -271,6 +273,112 @@ class SPAAM_SVD
 
 			return Proj3x4;
 		}
+
+		/************************************************************************************
+		This function creates a 4x4 projection matrix for use by OpenGL from a 3x4 projection
+		matrix and a set of orthographic parameters.
+
+		The function takes 6 parameters:
+		float ne - near clipping plane distane
+		float fr - far clipping plane distance
+		int right - right most pixel of the viewing screen
+		int left - left most pixel of the viewing screen
+		int top - top most pixel of the viewing screen
+		int bottom - bottom most pixel of the viewing screen
+
+		There is no return value for the function. The resulting 4x4 matrix is stored in the
+		data member 'projMat3x4'
+		************************************************************************************/
+		void BuildGLMatrix3x4(float ne, float fr, int right, int left, int top, int bottom){
+			projMat3x4[0] = Proj3x4(0, 0); projMat3x4[1] = Proj3x4(0, 1); projMat3x4[2] = Proj3x4(0, 2); projMat3x4[3] = Proj3x4(0, 3);
+			projMat3x4[4] = Proj3x4(1, 0); projMat3x4[5] = Proj3x4(1, 1); projMat3x4[6] = Proj3x4(1, 2); projMat3x4[7] = Proj3x4(1, 3);
+			projMat3x4[8] = Proj3x4(2, 0); projMat3x4[9] = Proj3x4(2, 1); projMat3x4[10] = Proj3x4(2, 2); projMat3x4[11] = Proj3x4(2, 3);
+
+			double* aproj = projMat3x4;
+			constructProjectionMatrix4x4_( aproj, aproj, ne, fr, right, left, top, bottom);
+		}
+		
+		/*****************************************************************************************
+		This function is simply called by the BuildGLMatrix3x4 function. There is really no reason
+		why this code needs to be in its own function. It could easily be combined.
+		*****************************************************************************************/
+		private:
+		void constructProjectionMatrix4x4_(double*& final, double* m, float ne, float fr, int right, int left, int top, int bottom)
+		{
+			double* proj4x4 = new double[16];
+
+			//Copy base 3x4 values//
+			memcpy(proj4x4, m, sizeof(double)*12); 		
+			//Duplicate third row into the fourth//
+			memcpy(proj4x4+12, m + 8, sizeof(double)*4);
+		
+			//calculate extra parameters//
+			double norm = sqrt(proj4x4[8] * proj4x4[8] + proj4x4[9] * proj4x4[9] + proj4x4[10] * proj4x4[10]);
+			double add = fr*ne*norm;
+
+			//Begin adjusting the 3x4 values for 4x4 use//
+			proj4x4[8] *= (-fr - ne);
+			proj4x4[9] *= (-fr - ne);
+			proj4x4[10] *= (-fr - ne);
+			proj4x4[11] *= (-fr - ne);
+			proj4x4[11] += add;	
+
+			//Create Orthographic projection matrix//
+			double* ortho = new double[16];
+			ortho[0] = 2.0f / (right - left);
+			ortho[1] = 0.0f;
+			ortho[2] = 0.0f;
+			ortho[3] = (right + left) / (left - right);
+			ortho[4] = 0.0f;
+			ortho[5] = 2.0f / (top - bottom);
+			ortho[6] = 0.0f;
+			ortho[7] = (top + bottom) / (bottom - top);
+			ortho[8] = 0.0f;
+			ortho[9] = 0.0f;
+			ortho[10] = 2.0f / (ne - fr);
+			ortho[11] = (fr + ne) / (ne - fr);
+			ortho[12] = 0.0f;
+			ortho[13] = 0.0f;
+			ortho[14] = 0.0f;
+			ortho[15] = 1.0f;
+
+			//Multiply the 4x4 projection by the orthographic projection//
+			final[0] = ortho[0]*proj4x4[0] + ortho[1]*proj4x4[4] + ortho[2]*proj4x4[8] + ortho[3]*proj4x4[12];
+			final[1] = ortho[0]*proj4x4[1] + ortho[1]*proj4x4[5] + ortho[2]*proj4x4[9] + ortho[3]*proj4x4[13];
+			final[2] = ortho[0]*proj4x4[2] + ortho[1]*proj4x4[6] + ortho[2]*proj4x4[10] + ortho[3]*proj4x4[14];
+			final[3] = ortho[0]*proj4x4[3] + ortho[1]*proj4x4[7] + ortho[2]*proj4x4[11] + ortho[3]*proj4x4[15];
+
+			final[4] = ortho[4]*proj4x4[0] + ortho[5]*proj4x4[4] + ortho[6]*proj4x4[8] + ortho[7]*proj4x4[12];
+			final[5] = ortho[4]*proj4x4[1] + ortho[5]*proj4x4[5] + ortho[6]*proj4x4[9] + ortho[7]*proj4x4[13];
+			final[6] = ortho[4]*proj4x4[2] + ortho[5]*proj4x4[6] + ortho[6]*proj4x4[10] + ortho[7]*proj4x4[14];
+			final[7] = ortho[4]*proj4x4[3] + ortho[5]*proj4x4[7] + ortho[6]*proj4x4[11] + ortho[7]*proj4x4[15];
+
+			final[8] = ortho[8]*proj4x4[0] + ortho[9]*proj4x4[4] + ortho[10]*proj4x4[8] + ortho[11]*proj4x4[12];
+			final[9] = ortho[8]*proj4x4[1] + ortho[9]*proj4x4[5] + ortho[10]*proj4x4[9] + ortho[11]*proj4x4[13];
+			final[10] = ortho[8]*proj4x4[2] + ortho[9]*proj4x4[6] + ortho[10]*proj4x4[10] + ortho[11]*proj4x4[14];
+			final[11] = ortho[8]*proj4x4[3] + ortho[9]*proj4x4[7] + ortho[10]*proj4x4[11] + ortho[11]*proj4x4[15];
+
+			final[12] = ortho[12]*proj4x4[0] + ortho[13]*proj4x4[4] + ortho[14]*proj4x4[8] + ortho[15]*proj4x4[12];
+			final[13] = ortho[12]*proj4x4[1] + ortho[13]*proj4x4[5] + ortho[14]*proj4x4[9] + ortho[15]*proj4x4[13];
+			final[14] = ortho[12]*proj4x4[2] + ortho[13]*proj4x4[6] + ortho[14]*proj4x4[10] + ortho[15]*proj4x4[14];
+			final[15] = ortho[12]*proj4x4[3] + ortho[13]*proj4x4[7] + ortho[14]*proj4x4[11] + ortho[15]*proj4x4[15];
+
+			proj4x4[0] = final[0]; proj4x4[1] = final[4]; proj4x4[2] = final[8]; proj4x4[3] = final[12];
+			proj4x4[4] = final[1]; proj4x4[5] = final[5]; proj4x4[6] = final[9]; proj4x4[7] = final[13];
+			proj4x4[8] = final[2]; proj4x4[9] = final[6]; proj4x4[10] = final[10]; proj4x4[11] = final[14];
+			proj4x4[12] = final[3]; proj4x4[13] = final[7]; proj4x4[14] = final[11]; proj4x4[15] = final[15];
+			
+			//copy final matrix values//
+			for (int i = 0; i < 16; i++)
+			{
+				final[i] = proj4x4[i];
+			}
+
+			//clean up//
+			delete [] ortho;
+			delete [] proj4x4;
+		}
+
 };
 
 #endif //__SPAAM_SVD__
